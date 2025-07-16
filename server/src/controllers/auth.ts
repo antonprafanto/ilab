@@ -119,7 +119,7 @@ class AuthController {
     try {
       await emailService.sendWelcomeEmail(
         user.email,
-        user.first_name
+        user.firstName
       );
     } catch (emailError) {
       logger.error('Failed to send welcome email:', emailError);

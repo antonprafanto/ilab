@@ -55,6 +55,8 @@ export type CreateUser = z.infer<typeof CreateUserSchema>;
 export const UpdateUserSchema = UserSchema.partial().omit({
   id: true,
   createdAt: true
+}).extend({
+  role: z.string().optional() // Allow role as string (role name) for updates
 });
 
 export type UpdateUser = z.infer<typeof UpdateUserSchema>;

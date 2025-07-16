@@ -14,7 +14,16 @@
       "Bash(git init:*)",
       "Bash(git remote add:*)",
       "Bash(git add:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(git push:*)",
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(for file in roles.ts samples.ts users.ts)",
+      "Bash(do echo \"Fixing $file...\")",
+      "Bash(sed:*)",
+      "Bash(done)",
+      "Bash(npx ts-node:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }

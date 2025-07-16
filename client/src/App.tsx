@@ -16,6 +16,10 @@ import ResetPasswordPage from '@/pages/auth/ResetPasswordPage'
 import VerifyEmailPage from '@/pages/auth/VerifyEmailPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 import ProfilePage from '@/pages/dashboard/ProfilePage'
+import UsersPage from '@/pages/dashboard/UsersPage'
+import RolesPage from '@/pages/dashboard/RolesPage'
+import BookingsPage from '@/pages/dashboard/BookingsPage'
+import EquipmentPage from '@/pages/dashboard/EquipmentPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 
 // Protected Route Component
@@ -56,6 +60,10 @@ function App() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="roles" element={<RolesPage />} />
+        <Route path="equipment" element={<EquipmentPage />} />
+        <Route path="bookings" element={<BookingsPage />} />
         {/* More dashboard routes will be added in next phases */}
       </Route>
 

@@ -8,12 +8,16 @@ import {
   DocumentIcon,
   CreditCardIcon,
   ChartBarIcon,
-  CogIcon
+  CogIcon,
+  UsersIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Profile', href: '/dashboard/profile', icon: UserIcon },
+  { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },
+  { name: 'Roles', href: '/dashboard/roles', icon: ShieldCheckIcon, adminOnly: true },
   { name: 'Peralatan', href: '/dashboard/equipment', icon: BeakerIcon },
   { name: 'Booking', href: '/dashboard/bookings', icon: CalendarIcon },
   { name: 'Sampel', href: '/dashboard/samples', icon: DocumentIcon },
@@ -27,6 +31,10 @@ export const Sidebar = () => {
 
   // Filter navigation based on user role
   const filteredNavigation = navigation.filter(item => {
+    // Admin-only items
+    if ((item as any).adminOnly && !['admin', 'director'].includes(user?.role || '')) {
+      return false
+    }
     // Basic filtering - will be enhanced based on role permissions
     if (item.name === 'Pengaturan' && !['admin', 'director'].includes(user?.role || '')) {
       return false

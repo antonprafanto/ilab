@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import authRoutes from './auth';
 import userRoutes from './users';
+import roleRoutes from './roles';
 import equipmentRoutes from './equipment';
+import equipmentCategoryRoutes from './equipment-categories';
 import bookingRoutes from './bookings';
 import sampleRoutes from './samples';
 import paymentRoutes from './payments';
@@ -23,7 +25,9 @@ router.get('/health', (req, res) => {
 // API route groups
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+router.use('/roles', roleRoutes);
 router.use('/equipment', equipmentRoutes);
+router.use('/equipment-categories', equipmentCategoryRoutes);
 router.use('/bookings', bookingRoutes);
 router.use('/samples', sampleRoutes);
 router.use('/payments', paymentRoutes);

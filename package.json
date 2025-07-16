@@ -17,8 +17,10 @@
     "clean": "rimraf node_modules server/node_modules client/node_modules server/dist client/dist",
     "test:backend": "cd server && npm run typecheck && npm run lint",
     "test:frontend": "cd client && npm run typecheck && npm run lint",
-    "test:all": "npm run test:backend && npm run test:frontend",
-    "test:setup": "node test-setup.js"
+    "test:all": "npm run test:api && npm run test:workflow",
+    "test:setup": "node run-tests.js",
+    "test:api": "node test-api.js",
+    "test:workflow": "node test-workflow.js"
   },
   "keywords": [
     "laboratory",
