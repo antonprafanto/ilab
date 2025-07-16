@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run install:all:*)",
+      "Bash(pnpm install:*)",
+      "Bash(yarn install)",
+      "Bash(npm run:*)",
+      "Bash(mysql:*)",
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": []
+  }
+}
