@@ -16,13 +16,14 @@ class EmailNotification {
     
     public function __construct() {
         $this->db = Database::getInstance()->getConnection();
-        $this->smtp_host = SMTP_HOST;
-        $this->smtp_port = SMTP_PORT;
-        $this->smtp_username = SMTP_USERNAME;
-        $this->smtp_password = SMTP_PASSWORD;
-        $this->smtp_encryption = SMTP_ENCRYPTION;
-        $this->from_email = SMTP_USERNAME;
-        $this->from_name = SITE_NAME;
+        // Use environment variables or defaults for SMTP settings
+        $this->smtp_host = $_ENV['SMTP_HOST'] ?? 'localhost';
+        $this->smtp_port = $_ENV['SMTP_PORT'] ?? '587';
+        $this->smtp_username = $_ENV['SMTP_USERNAME'] ?? 'noreply@ilab.unmul.ac.id';
+        $this->smtp_password = $_ENV['SMTP_PASSWORD'] ?? '';
+        $this->smtp_encryption = $_ENV['SMTP_ENCRYPTION'] ?? 'tls';
+        $this->from_email = $_ENV['FROM_EMAIL'] ?? 'noreply@ilab.unmul.ac.id';
+        $this->from_name = $_ENV['FROM_NAME'] ?? 'ILab UNMUL';
     }
     
     /**
@@ -103,8 +104,8 @@ class EmailNotification {
                 'time_start' => date('H:i', strtotime($booking['time_start'])),
                 'time_end' => date('H:i', strtotime($booking['time_end'])),
                 'status' => ucfirst(str_replace('_', ' ', $booking['status'])),
-                'site_url' => SITE_URL,
-                'tracking_url' => SITE_URL . '/public/process-tracking.php?booking=' . $booking['booking_code']
+                'site_url' => ($_ENV['SITE_URL'] ?? 'http://localhost'),
+                'tracking_url' => ($_ENV['SITE_URL'] ?? 'http://localhost') . '/public/process-tracking.php?booking=' . $booking['booking_code']
             ];
             
             return $this->sendNotification(
@@ -143,8 +144,8 @@ class EmailNotification {
                 'user_name' => $user['full_name'],
                 'username' => $user['username'],
                 'role_name' => ucfirst(str_replace('_', ' ', $user['role_name'])),
-                'site_url' => SITE_URL,
-                'login_url' => SITE_URL . '/public/login.php'
+                'site_url' => ($_ENV['SITE_URL'] ?? 'http://localhost'),
+                'login_url' => ($_ENV['SITE_URL'] ?? 'http://localhost') . '/public/login.php'
             ];
             
             return $this->sendNotification(

@@ -10,7 +10,7 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
     <div class="container">
         <a class="navbar-brand" href="index.php">
-            <img src="images/logo-unmul-white.png" alt="UNMUL" height="40" class="me-2">
+            <i class="fas fa-flask me-2"></i>
             <strong>ILab UNMUL</strong>
         </a>
         
@@ -146,13 +146,13 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
                             <?php if (has_role(['staf_ilab'])): ?>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header">Admin Panel</h6></li>
-                                <li><a class="dropdown-item" href="admin/dashboard.php">
+                                <li><a class="dropdown-item" href="../admin/dashboard/">
                                     <i class="fas fa-cogs me-2"></i>Admin Dashboard
                                 </a></li>
-                                <li><a class="dropdown-item" href="admin/bookings.php">
+                                <li><a class="dropdown-item" href="../admin/bookings/">
                                     <i class="fas fa-list me-2"></i>Kelola Booking
                                 </a></li>
-                                <li><a class="dropdown-item" href="admin/users.php">
+                                <li><a class="dropdown-item" href="../admin/users/">
                                     <i class="fas fa-users me-2"></i>Kelola User
                                 </a></li>
                             <?php endif; ?>

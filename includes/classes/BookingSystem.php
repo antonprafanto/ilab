@@ -68,6 +68,12 @@ class BookingSystem {
             
             $booking_id = $this->db->lastInsertId();
             
+            // Handle equipment booking
+            if (!empty($booking_data['equipment_ids']) && is_array($booking_data['equipment_ids'])) {
+                $this->bookEquipment($booking_id, $booking_data['equipment_ids'], $booking_data['booking_date'], 
+                                   $booking_data['time_start'], $booking_data['time_end']);
+            }
+            
             // Initialize process tracking
             $this->initializeProcessTracking($booking_id, $booking_data['process_type'] ?? 'text_based_8step');
             
@@ -587,6 +593,147 @@ class BookingSystem {
         $total_slots = 9; // 8 AM - 5 PM = 9 hours
         $booked_slots = count($this->getAvailableTimeSlots($date, 1));
         return max(0, $total_slots - $booked_slots);
+    }
+    
+    /**
+     * Book equipment for a specific booking
+     */
+    private function bookEquipment($booking_id, $equipment_ids, $booking_date, $time_start, $time_end) {
+        try {
+            foreach ($equipment_ids as $equipment_id) {
+                // Check if equipment is available
+                if (!$this->isEquipmentAvailable($equipment_id, $booking_date, $time_start, $time_end)) {
+                    // Get equipment name for error message
+                    $stmt = $this->db->prepare("SELECT equipment_name FROM equipment WHERE id = ?");
+                    $stmt->execute([$equipment_id]);
+                    $equipment = $stmt->fetch();
+                    $equipment_name = $equipment ? $equipment['equipment_name'] : "Equipment ID $equipment_id";
+                    
+                    throw new Exception("Equipment '$equipment_name' is not available for the selected time slot");
+                }
+                
+                // Create equipment booking record
+                $stmt = $this->db->prepare("
+                    INSERT INTO equipment_bookings (
+                        booking_id, equipment_id, booking_date, time_start, time_end, 
+                        status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, 'booked', NOW())
+                ");
+                $stmt->execute([$booking_id, $equipment_id, $booking_date, $time_start, $time_end]);
+                
+                // Update equipment status to 'reserved' for the time period
+                $stmt = $this->db->prepare("
+                    UPDATE equipment 
+                    SET status = 'in_use', last_used_date = ? 
+                    WHERE id = ?
+                ");
+                $stmt->execute([$booking_date, $equipment_id]);
+            }
+        } catch (Exception $e) {
+            throw new Exception("Equipment booking failed: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Check if equipment is available for booking
+     */
+    private function isEquipmentAvailable($equipment_id, $booking_date, $time_start, $time_end) {
+        try {
+            // Check if equipment exists and is available
+            $stmt = $this->db->prepare("
+                SELECT status FROM equipment 
+                WHERE id = ? AND status IN ('available', 'in_use')
+            ");
+            $stmt->execute([$equipment_id]);
+            $equipment = $stmt->fetch();
+            
+            if (!$equipment) {
+                return false; // Equipment doesn't exist or not available
+            }
+            
+            // Check for conflicting bookings
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*) as count 
+                FROM equipment_bookings eb
+                JOIN facility_bookings fb ON eb.booking_id = fb.id
+                WHERE eb.equipment_id = ? 
+                AND eb.booking_date = ?
+                AND fb.status NOT IN ('cancelled', 'completed')
+                AND (
+                    (eb.time_start <= ? AND eb.time_end > ?) OR 
+                    (eb.time_start < ? AND eb.time_end >= ?) OR 
+                    (eb.time_start >= ? AND eb.time_end <= ?)
+                )
+            ");
+            $stmt->execute([
+                $equipment_id, $booking_date,
+                $time_start, $time_start,
+                $time_end, $time_end,
+                $time_start, $time_end
+            ]);
+            $result = $stmt->fetch();
+            
+            return $result['count'] == 0;
+            
+        } catch (Exception $e) {
+            error_log("Equipment availability check error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get equipment bookings for a specific booking
+     */
+    public function getBookingEquipment($booking_id) {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT 
+                    e.*,
+                    ec.category_name,
+                    eb.booking_date,
+                    eb.time_start,
+                    eb.time_end,
+                    eb.status as booking_status
+                FROM equipment_bookings eb
+                JOIN equipment e ON eb.equipment_id = e.id
+                JOIN equipment_categories ec ON e.category_id = ec.id
+                WHERE eb.booking_id = ?
+                ORDER BY ec.category_name, e.equipment_name
+            ");
+            $stmt->execute([$booking_id]);
+            return $stmt->fetchAll();
+        } catch (Exception $e) {
+            error_log("Get booking equipment error: " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
+     * Update equipment status when booking status changes
+     */
+    public function updateEquipmentStatus($booking_id, $new_status) {
+        try {
+            if ($new_status === 'completed' || $new_status === 'cancelled') {
+                // Release equipment
+                $stmt = $this->db->prepare("
+                    UPDATE equipment e
+                    JOIN equipment_bookings eb ON e.id = eb.equipment_id
+                    SET e.status = 'available'
+                    WHERE eb.booking_id = ?
+                ");
+                $stmt->execute([$booking_id]);
+                
+                // Update equipment booking status
+                $stmt = $this->db->prepare("
+                    UPDATE equipment_bookings 
+                    SET status = ? 
+                    WHERE booking_id = ?
+                ");
+                $stmt->execute([$new_status, $booking_id]);
+            }
+        } catch (Exception $e) {
+            error_log("Update equipment status error: " . $e->getMessage());
+        }
     }
 }
 ?>

@@ -25,6 +25,38 @@ $current_user = $user->getUserById($_SESSION['user_id']);
 $service_categories = $booking_system->getServiceCategories();
 $service_types = $booking_system->getServiceTypes();
 
+// Get equipment for pre-selection (if coming from equipment page)
+$selected_equipment_id = $_GET['equipment'] ?? '';
+$selected_equipment = null;
+if ($selected_equipment_id) {
+    $db = Database::getInstance()->getConnection();
+    try {
+        $stmt = $db->prepare("SELECT * FROM equipment WHERE id = ? AND status = 'available'");
+        $stmt->execute([$selected_equipment_id]);
+        $selected_equipment = $stmt->fetch();
+    } catch (Exception $e) {
+        // Equipment not found or not available
+        $selected_equipment = null;
+    }
+}
+
+// Get all available equipment for selection
+$available_equipment = [];
+try {
+    $db = Database::getInstance()->getConnection();
+    $stmt = $db->prepare("
+        SELECT e.*, ec.category_name 
+        FROM equipment e 
+        JOIN equipment_categories ec ON e.category_id = ec.id 
+        WHERE e.status = 'available' 
+        ORDER BY ec.category_name, e.equipment_name
+    ");
+    $stmt->execute();
+    $available_equipment = $stmt->fetchAll();
+} catch (Exception $e) {
+    $available_equipment = [];
+}
+
 // Handle booking form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
@@ -33,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $booking_data = [
             'service_category_id' => intval($_POST['service_category_id'] ?? 0),
             'service_type_id' => intval($_POST['service_type_id'] ?? 0),
+            'equipment_ids' => $_POST['equipment_ids'] ?? [], // New: equipment selection
             'facility_requested' => sanitize_input($_POST['facility_requested'] ?? ''),
             'purpose' => sanitize_input($_POST['purpose'] ?? ''),
             'sample_description' => sanitize_input($_POST['sample_description'] ?? ''),
@@ -426,12 +459,66 @@ $calendar_data = $booking_system->getCalendarData($current_month, $current_year)
                             <h4 class="mb-4 text-center">Detail Booking</h4>
                             
                             <div class="row g-3">
+                                <!-- Equipment Selection -->
+                                <div class="col-12">
+                                    <label class="form-label">
+                                        <i class="fas fa-microscope me-2"></i>Equipment Selection
+                                    </label>
+                                    <div class="equipment-selection-container" style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 8px; padding: 1rem;">
+                                        <?php if (!empty($available_equipment)): ?>
+                                            <?php 
+                                            $current_category = '';
+                                            foreach ($available_equipment as $equipment): 
+                                                if ($current_category !== $equipment['category_name']):
+                                                    if ($current_category !== '') echo '</div>';
+                                                    $current_category = $equipment['category_name'];
+                                            ?>
+                                            <div class="equipment-category mb-3">
+                                                <h6 class="text-primary border-bottom pb-2"><?= htmlspecialchars($current_category) ?></h6>
+                                            <?php endif; ?>
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input equipment-checkbox" type="checkbox" 
+                                                           name="equipment_ids[]" value="<?= $equipment['id'] ?>" 
+                                                           id="equipment_<?= $equipment['id'] ?>"
+                                                           <?= ($selected_equipment && $selected_equipment['id'] == $equipment['id']) ? 'checked' : '' ?>>
+                                                    <label class="form-check-label w-100" for="equipment_<?= $equipment['id'] ?>">
+                                                        <div class="d-flex justify-content-between align-items-start">
+                                                            <div>
+                                                                <strong><?= htmlspecialchars($equipment['equipment_name']) ?></strong>
+                                                                <br>
+                                                                <small class="text-muted">
+                                                                    <?= htmlspecialchars($equipment['brand']) ?> <?= htmlspecialchars($equipment['model']) ?>
+                                                                    <br>Code: <?= htmlspecialchars($equipment['equipment_code']) ?>
+                                                                    <br>Location: <?= htmlspecialchars($equipment['location']) ?>
+                                                                </small>
+                                                            </div>
+                                                            <span class="badge bg-success">Available</span>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            <?php endforeach; ?>
+                                            <?php if ($current_category !== '') echo '</div>'; ?>
+                                        <?php else: ?>
+                                            <div class="text-center text-muted py-3">
+                                                <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
+                                                <p>No equipment currently available for booking</p>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        Select the equipment you need for your research/testing. Multiple selections allowed.
+                                    </small>
+                                </div>
+                                
                                 <div class="col-12">
                                     <label for="facilityRequested" class="form-label">
-                                        <i class="fas fa-flask me-2"></i>Fasilitas/Peralatan yang Diminta *
+                                        <i class="fas fa-flask me-2"></i>Additional Facilities/Resources Needed
                                     </label>
                                     <textarea class="form-control" id="facilityRequested" name="facility_requested" 
-                                              rows="3" required placeholder="Sebutkan secara spesifik fasilitas atau peralatan yang akan digunakan..."><?= htmlspecialchars($_POST['facility_requested'] ?? '') ?></textarea>
+                                              rows="3" placeholder="Specify any additional facilities, consumables, or resources needed beyond the selected equipment..."><?= htmlspecialchars($_POST['facility_requested'] ?? '') ?></textarea>
+                                    <small class="form-text text-muted">
+                                        This field is now optional if you've selected equipment above. Use it to specify additional needs.
+                                    </small>
                                 </div>
                                 
                                 <div class="col-12">

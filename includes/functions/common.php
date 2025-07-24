@@ -48,6 +48,211 @@ function format_indonesian_date($date) {
     return "$day $month $year";
 }
 
+// Authentication functions
+function require_login() {
+    if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
+        header('Location: login.php');
+        exit();
+    }
+}
+
+function require_role($required_roles) {
+    require_login();
+    
+    if (!is_array($required_roles)) {
+        $required_roles = [$required_roles];
+    }
+    
+    if (!isset($_SESSION['role_name']) || !in_array($_SESSION['role_name'], $required_roles)) {
+        header('HTTP/1.0 403 Forbidden');
+        die('Access denied. Insufficient permissions.');
+    }
+}
+
+function is_admin() {
+    return isset($_SESSION['role_name']) && 
+           in_array($_SESSION['role_name'], ['super_admin', 'staf_ilab', 'kepala_lab']);
+}
+
+function get_user_id() {
+    return $_SESSION['user_id'] ?? null;
+}
+
+function get_user_role() {
+    return $_SESSION['role_name'] ?? null;
+}
+
+// File handling functions
+function get_file_icon($filename) {
+    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    
+    $icons = [
+        'pdf' => 'fas fa-file-pdf text-danger',
+        'doc' => 'fas fa-file-word text-primary',
+        'docx' => 'fas fa-file-word text-primary',
+        'xlsx' => 'fas fa-file-excel text-success',
+        'pptx' => 'fas fa-file-powerpoint text-warning',
+        'jpg' => 'fas fa-file-image text-info',
+        'jpeg' => 'fas fa-file-image text-info',
+        'png' => 'fas fa-file-image text-info',
+        'txt' => 'fas fa-file-alt text-secondary'
+    ];
+    
+    return $icons[$extension] ?? 'fas fa-file text-muted';
+}
+
+function format_file_size($bytes) {
+    if ($bytes >= 1073741824) {
+        return number_format($bytes / 1073741824, 2) . ' GB';
+    } elseif ($bytes >= 1048576) {
+        return number_format($bytes / 1048576, 2) . ' MB';
+    } elseif ($bytes >= 1024) {
+        return number_format($bytes / 1024, 2) . ' KB';
+    } else {
+        return $bytes . ' bytes';
+    }
+}
+
+// Notification helper functions
+function send_booking_notification($booking_id, $type = 'created') {
+    try {
+        require_once __DIR__ . '/../classes/NotificationSystem.php';
+        $notification = new NotificationSystem();
+        return $notification->sendBookingNotification($booking_id, $type);
+    } catch (Exception $e) {
+        error_log("Notification helper error: " . $e->getMessage());
+        return false;
+    }
+}
+
+function send_registration_notification($user_id) {
+    try {
+        require_once __DIR__ . '/../classes/NotificationSystem.php';
+        $notification = new NotificationSystem();
+        return $notification->sendRegistrationNotification($user_id);
+    } catch (Exception $e) {
+        error_log("Registration notification error: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Activity logging functions
+function log_activity($user_id, $action, $details = '') {
+    try {
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare("
+            INSERT INTO activity_logs (user_id, action, details, ip_address, created_at)
+            VALUES (?, ?, ?, ?, NOW())
+        ");
+        
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $stmt->execute([$user_id, $action, $details, $ip_address]);
+        
+        return true;
+    } catch (Exception $e) {
+        error_log("Activity logging error: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Equipment availability functions
+function check_equipment_availability($equipment_id, $date, $time_start, $time_end, $exclude_booking_id = null) {
+    try {
+        $db = Database::getInstance()->getConnection();
+        
+        $sql = "
+            SELECT COUNT(*) as conflicts
+            FROM equipment_bookings eb
+            JOIN facility_bookings fb ON eb.booking_id = fb.id
+            WHERE eb.equipment_id = ?
+            AND fb.booking_date = ?
+            AND fb.status NOT IN ('cancelled', 'rejected')
+            AND (
+                (fb.time_start < ? AND fb.time_end > ?) OR
+                (fb.time_start < ? AND fb.time_end > ?) OR
+                (fb.time_start >= ? AND fb.time_end <= ?)
+            )
+        ";
+        
+        $params = [$equipment_id, $date, $time_end, $time_start, $time_end, $time_start, $time_start, $time_end];
+        
+        if ($exclude_booking_id) {
+            $sql .= " AND fb.id != ?";
+            $params[] = $exclude_booking_id;
+        }
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['conflicts'] == 0;
+        
+    } catch (Exception $e) {
+        error_log("Equipment availability check error: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Validation functions
+function validate_time_slot($date, $time_start, $time_end) {
+    // Check if date is not in the past
+    if (strtotime($date) < strtotime(date('Y-m-d'))) {
+        return ['valid' => false, 'message' => 'Cannot book for past dates'];
+    }
+    
+    // Check if start time is before end time
+    if (strtotime($time_start) >= strtotime($time_end)) {
+        return ['valid' => false, 'message' => 'Start time must be before end time'];
+    }
+    
+    // Check minimum booking duration (30 minutes)
+    $duration = (strtotime($time_end) - strtotime($time_start)) / 60;
+    if ($duration < 30) {
+        return ['valid' => false, 'message' => 'Minimum booking duration is 30 minutes'];
+    }
+    
+    // Check maximum booking duration (8 hours)
+    if ($duration > 480) {
+        return ['valid' => false, 'message' => 'Maximum booking duration is 8 hours'];
+    }
+    
+    // Check operating hours (7:00 - 18:00)
+    $start_hour = (int)date('H', strtotime($time_start));
+    $end_hour = (int)date('H', strtotime($time_end));
+    
+    if ($start_hour < 7 || $end_hour > 18) {
+        return ['valid' => false, 'message' => 'Booking hours must be between 07:00 - 18:00'];
+    }
+    
+    return ['valid' => true];
+}
+
+// Status badge helper
+function get_status_badge($status) {
+    $badges = [
+        'pending' => '<span class="badge bg-warning">Pending</span>',
+        'approved' => '<span class="badge bg-success">Approved</span>',
+        'rejected' => '<span class="badge bg-danger">Rejected</span>',
+        'cancelled' => '<span class="badge bg-secondary">Cancelled</span>',
+        'completed' => '<span class="badge bg-primary">Completed</span>',
+        'in_progress' => '<span class="badge bg-info">In Progress</span>'
+    ];
+    
+    return $badges[$status] ?? '<span class="badge bg-secondary">' . ucfirst($status) . '</span>';
+}
+
+// Priority badge helper
+function get_priority_badge($priority) {
+    $badges = [
+        'low' => '<span class="badge bg-secondary">Low</span>',
+        'normal' => '<span class="badge bg-primary">Normal</span>',
+        'high' => '<span class="badge bg-warning">High</span>',
+        'urgent' => '<span class="badge bg-danger">Urgent</span>'
+    ];
+    
+    return $badges[$priority] ?? '<span class="badge bg-primary">Normal</span>';
+}
+
 function time_ago($datetime) {
     $time = time() - strtotime($datetime);
     

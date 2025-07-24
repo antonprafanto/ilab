@@ -225,6 +225,69 @@ CREATE TABLE booking_process_tracking (
     FOREIGN KEY (assigned_to) REFERENCES users(id)
 );
 
+-- Equipment booking table for booking-equipment integration
+CREATE TABLE equipment_bookings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    booking_id INT NOT NULL,
+    equipment_id INT NOT NULL,
+    booking_date DATE NOT NULL,
+    time_start TIME NOT NULL,
+    time_end TIME NOT NULL,
+    status ENUM('booked', 'in_use', 'completed', 'cancelled') DEFAULT 'booked',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (booking_id) REFERENCES facility_bookings(id) ON DELETE CASCADE,
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id),
+    INDEX idx_equipment_date_time (equipment_id, booking_date, time_start, time_end),
+    INDEX idx_booking_equipment (booking_id, equipment_id)
+);
+
+-- Contact messages table
+CREATE TABLE contact_messages (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
+    subject VARCHAR(500) NOT NULL,
+    message TEXT NOT NULL,
+    category ENUM('general_inquiry', 'booking_service', 'technical_support', 'collaboration', 'training', 'complaint', 'other') NOT NULL,
+    user_id INT NULL,
+    status ENUM('new', 'in_progress', 'resolved', 'closed') DEFAULT 'new',
+    assigned_to INT NULL,
+    admin_response TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (assigned_to) REFERENCES users(id)
+);
+
+-- Laboratory activities table (enhanced)
+CREATE TABLE laboratory_activities (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NULL,
+    booking_id INT NULL,
+    equipment_id INT NULL,
+    title VARCHAR(500) NOT NULL,
+    category ENUM('research', 'training', 'calibration', 'maintenance', 'testing', 'other') NOT NULL,
+    activity_date DATE NOT NULL,
+    duration_hours DECIMAL(4,2),
+    description TEXT NOT NULL,
+    results TEXT,
+    samples_processed VARCHAR(255),
+    attachments JSON, -- Array of attachment info
+    priority ENUM('normal', 'high') DEFAULT 'normal',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (booking_id) REFERENCES facility_bookings(id),
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id),
+    INDEX idx_activity_date (activity_date),
+    INDEX idx_activity_category (category),
+    INDEX idx_user_activities (user_id, activity_date)
+);
+
 -- =====================================================
 -- 6. SOP MANAGEMENT (11 CATEGORIES)
 -- =====================================================
@@ -582,6 +645,39 @@ INSERT INTO stakeholder_benefits (stakeholder_category, benefit_type, descriptio
 
 ('umkm', 'Development', 'Business development support'),
 ('umkm', 'Training', 'Technical training dan skill development');
+
+-- File upload tracking table
+CREATE TABLE file_uploads (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NULL,
+    filename VARCHAR(255) NOT NULL,
+    original_name VARCHAR(255),
+    file_size BIGINT NOT NULL,
+    mime_type VARCHAR(100),
+    upload_path VARCHAR(500) NOT NULL,
+    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address VARCHAR(45),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    INDEX idx_user_uploads (user_id, upload_time),
+    INDEX idx_upload_date (upload_time)
+);
+
+-- Download logs table
+CREATE TABLE download_logs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    booking_id INT NULL,
+    download_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (booking_id) REFERENCES facility_bookings(id),
+    INDEX idx_user_downloads (user_id, download_time),
+    INDEX idx_booking_downloads (booking_id, download_time)
+);
 
 -- =====================================================
 -- INDEX OPTIMIZATION
